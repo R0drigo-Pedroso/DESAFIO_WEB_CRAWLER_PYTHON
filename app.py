@@ -1,6 +1,3 @@
-Claro, aqui está o seu código com comentários:
-
-```python
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -89,4 +86,3 @@ while pagina_atual <= 100:  # Limite de 100 páginas
 # Criar DataFrame e salvar em um arquivo Excel
 df = pd.DataFrame(dados_totais, columns=['URL da Publicação', 'Nome da Publicação', 'Data da Publicação', 'Publicado por', 'URL de Download'])
 df.to_excel('dados_melody_brazil.xlsx', index=False)
-```
