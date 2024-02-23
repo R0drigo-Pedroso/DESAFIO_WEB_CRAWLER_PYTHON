@@ -2,6 +2,9 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from urllib.parse import urlparse, urlencode
+import concurrent.futures
+import time
+from datetime import datetime
 
 # Definir a URL base e os parâmetros padrão
 base_url = 'https://www.melodybrazil.com/search'
@@ -12,77 +15,63 @@ default_params = {
 
 # Função para extrair dados da página
 def extrair_dados_pagina(url):
-    # Imprime a URL da página que está sendo extraída
     print("Extraindo dados da página:", url)
-    
-    # Faz uma requisição GET para a URL
     pagina = requests.get(url)
-    
-    # Usa BeautifulSoup para analisar o conteúdo da página
     site = BeautifulSoup(pagina.content, 'html.parser')
-    
-    # Encontra todos os elementos 'div' com a classe 'grid-posts'
     music = site.find_all('div', attrs={'class': 'grid-posts'})
-    
-    # Inicializa uma lista para armazenar os dados extraídos
     dados = []
-    
-    # Itera sobre cada elemento 'div' encontrado
     for musi in music:
         for div in musi.find_all('div', recursive=False):
-            # Extrai a URL, o nome, a data e o autor da publicação
             url_publicacao = div.find('a')['href']
             nome_publicacao = div.find('h2', class_='post-title').text
             data_publicacao = div.find('time', class_='post-datepublished').text.strip()
             publicacao_por_tag = div.find('span', class_='post-author')
             publicacao_por = publicacao_por_tag.text.strip() if publicacao_por_tag else 'Autor Desconhecido'
             url_download = div.find('a', class_='read-more')['href']
-            
-            # Adiciona os dados extraídos à lista
             dados.append([url_publicacao, nome_publicacao, data_publicacao, publicacao_por, url_download])
-    
-    # Retorna a lista de dados
     return dados
 
-# Extrair dados da página inicial
-dados_totais = []
-params = default_params.copy()
-url = f'{base_url}?{urlencode(params)}'
-dados_pagina = extrair_dados_pagina(url)
-dados_totais.extend(dados_pagina)
+# Função para extrair dados de uma única página
+def extrair_dados_pagina_individual(url):
+    try:
+        return extrair_dados_pagina(url)
+    except Exception as e:
+        print(f"Erro ao extrair dados da página {url}: {e}")
+        return []
 
-# Extrair dados das demais páginas (se houver) até a página 100
-pagina_atual = 0
-while pagina_atual <= 100:  # Limite de 100 páginas
-    params['PageNo'] = pagina_atual
-    url = f'{base_url}?{urlencode(params)}'
+# Função para extrair dados de várias páginas em paralelo
+def extrair_dados_paralelo(base_url, params, total_pages):
+    dados_totais = []
+    urls = [f'{base_url}?{urlencode(params)}&PageNo={i}' for i in range(total_pages)]
     
-    # Imprime a URL da página que está sendo extraída
-    print("Extraindo dados da página:", url)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        resultados = executor.map(extrair_dados_pagina_individual, urls)
+        for resultado in resultados:
+            dados_totais.extend(resultado)
     
-    # Faz uma requisição GET para a URL
-    pagina = requests.get(url)
-    
-    # Se a página não existir (status code 404), interrompe o loop
-    if pagina.status_code == 404:
-        break
-    
-    # Usa BeautifulSoup para analisar o conteúdo da página
-    site = BeautifulSoup(pagina.content, 'html.parser')
-    
-    # Se a página não contiver nenhum elemento 'div' com a classe 'grid-posts', interrompe o loop
-    if not site.find('div', class_='grid-posts'):
-        break
-    
-    # Extrai os dados da página
-    dados_pagina = extrair_dados_pagina(url)
-    
-    # Adiciona os dados extraídos à lista total de dados
-    dados_totais.extend(dados_pagina)
-    
-    # Incrementa o número da página
-    pagina_atual += 1
+    return dados_totais
 
-# Criar DataFrame e salvar em um arquivo Excel
-df = pd.DataFrame(dados_totais, columns=['URL da Publicação', 'Nome da Publicação', 'Data da Publicação', 'Publicado por', 'URL de Download'])
-df.to_excel('dados_melody_brazil.xlsx', index=False)
+# Função para salvar dados em um arquivo Excel com a data da atualização
+def salvar_dados_excel_com_data(dados, prefixo='dados_melody_brazil'):
+    data_atualizacao = datetime.now().strftime("%Y-%m-%d")
+    filename = f'{prefixo}_{data_atualizacao}.xlsx'
+    df = pd.DataFrame(dados, columns=['URL da Publicação', 'Nome da Publicação', 'Data da Publicação', 'Publicado por', 'URL de Download'])
+    df.to_excel(filename, index=False)
+    print(f"Dados salvos em {filename}")
+
+# Número máximo de páginas para buscar inicialmente
+MAX_PAGES_INITIAL = 2960
+# Intervalo de atualização em segundos (24 horas)
+UPDATE_INTERVAL_SECONDS = 24 * 60 * 60
+
+# Loop infinito para extração e atualização de dados
+while True:
+    # Extrair dados de todas as páginas
+    dados_totais = extrair_dados_paralelo(base_url, default_params, MAX_PAGES_INITIAL)
+    
+    # Salvar os dados em um arquivo Excel com a data da atualização
+    salvar_dados_excel_com_data(dados_totais)
+    
+    print("Aguardando próxima atualização...")
+    # Aguardar o intervalo de atualização antes de executar novamente
+    time.sleep(UPDATE_INTERVAL_SECONDS)
