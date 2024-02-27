@@ -60,6 +60,7 @@ def salvar_dados_excel_com_data(dados, prefixo='dados_melody_brazil'):
     df.to_excel(filename, index=False)
     print(f"Dados salvos em {filename}")
     
+# Função para salvar dados em um arquivo json com a data da atualização
 def salvar_dados_json_com_data(dados, prefixo='dados_melody_brazil'):
     data_atualizacao = datetime.now().strftime("%Y-%m-%d")
     filename = f'{prefixo}_{data_atualizacao}.json'
