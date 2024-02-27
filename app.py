@@ -5,6 +5,7 @@ from urllib.parse import urlparse, urlencode
 import concurrent.futures
 import time
 from datetime import datetime
+import json
 
 # Definir a URL base e os parâmetros padrão
 base_url = 'https://www.melodybrazil.com/search'
@@ -58,6 +59,13 @@ def salvar_dados_excel_com_data(dados, prefixo='dados_melody_brazil'):
     df = pd.DataFrame(dados, columns=['URL da Publicação', 'Nome da Publicação', 'Data da Publicação', 'Publicado por', 'URL de Download'])
     df.to_excel(filename, index=False)
     print(f"Dados salvos em {filename}")
+    
+def salvar_dados_json_com_data(dados, prefixo='dados_melody_brazil'):
+    data_atualizacao = datetime.now().strftime("%Y-%m-%d")
+    filename = f'{prefixo}_{data_atualizacao}.json'
+    with open(filename, 'w', encoding='utf-8') as file:
+        json.dump(dados, file, ensure_ascii=False, indent=4)
+    print(f"Dados salvos em {filename}")
 
 # Número máximo de páginas para buscar inicialmente
 MAX_PAGES_INITIAL = 2960
@@ -71,6 +79,9 @@ while True:
     
     # Salvar os dados em um arquivo Excel com a data da atualização
     salvar_dados_excel_com_data(dados_totais)
+    
+    # Salvar os dados em um arquivo JSON com a data da atualização
+    salvar_dados_json_com_data(dados_totais)
     
     print("Aguardando próxima atualização...")
     # Aguardar o intervalo de atualização antes de executar novamente
